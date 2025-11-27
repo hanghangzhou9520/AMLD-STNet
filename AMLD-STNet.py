@@ -44,28 +44,6 @@ def build_tridiagonal_diag(n, a, b, c):
     diag_sub = torch.diag(torch.full((n - 1,), c), diagonal=-1)
     return diag_main + diag_super + diag_sub
 
-class LDNET(nn.Module):
-    def __init__(self, in_channels, joints_dim):
-        super(LDNET, self).__init__()
-        self.G = nn.Parameter(torch.zeros(size=[joints_dim, 1], dtype=torch.float))
-        self.A_D = torch.eye(joints_dim, dtype=torch.float).expand(joints_dim, joints_dim)
-        self.Gamma_D = Gamma(in_channels, joints_dim, self.A_D.cuda(), bias=True)
-        self.A_C = build_tridiagonal_diag(joints_dim, 1.0, 1.0, 1.0).expand(joints_dim, joints_dim)
-        self.Gamma_C = Gamma(in_channels, joints_dim, self.A_C.cuda(), bias=True)
-        self.soft = nn.Softmax(dim=-1)
-        self.prelu = nn.PReLU()
-
-    def forward(self, x):
-        x = x.permute(0, 2, 3, 1)
-        D = self.Gamma_D(x)
-        C = self.Gamma_C(x)
-        Q1 = Rho(x, dim=1)
-        Q2 = Rho(Q1, dim=1)
-        F = torch.matmul(D, Q2) + torch.matmul(C, Q1) + self.G
-        F = self.soft(F.permute(0, 3, 1, 2))
-        F_A = self.prelu(D + C + self.G)
-        return F.contiguous(), F_A
-
 
 class JointForceRestoring(nn.Module):
     def __init__(self, in_channels, output_channels, joints_dim, joints_dim_r, p=0, dropout=None):
@@ -253,3 +231,4 @@ class AMLDSTNet(nn.Module):
         for i in range(1, self.JointForceDecoder_layers):
             x = self.prelus[i](self.JointForceDecoder[i](x)) + x
         return x
+

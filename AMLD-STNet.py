@@ -44,6 +44,28 @@ def build_tridiagonal_diag(n, a, b, c):
     diag_sub = torch.diag(torch.full((n - 1,), c), diagonal=-1)
     return diag_main + diag_super + diag_sub
 
+class LDNET(nn.Module):
+    def __init__(self, in_channels, joints_dim):
+        super(LDNET, self).__init__()
+        self.G = nn.Parameter(torch.zeros(size=[joints_dim, 1], dtype=torch.float))
+        self.A_D = torch.eye(joints_dim, dtype=torch.float).expand(joints_dim, joints_dim)
+        self.Gamma_D = Gamma(in_channels, joints_dim, self.A_D.cuda(), bias=True)
+        self.A_C = build_tridiagonal_diag(joints_dim, 1.0, 1.0, 1.0).expand(joints_dim, joints_dim)
+        self.Gamma_C = Gamma(in_channels, joints_dim, self.A_C.cuda(), bias=True)
+        self.soft = nn.Softmax(dim=-1)
+        self.prelu = nn.PReLU()
+
+    def forward(self, x):
+        x = x.permute(0, 2, 3, 1)
+        D = self.Gamma_D(x)
+        C = self.Gamma_C(x)
+        Q1 = Rho(x, dim=1)
+        Q2 = Rho(Q1, dim=1)
+        F = torch.matmul(D, Q2) + torch.matmul(C, Q1) + self.G
+        F = self.soft(F.permute(0, 3, 1, 2))
+        F_A = self.prelu(D + C + self.G)
+        return F.contiguous(), F_A
+
 
 class JointForceRestoring(nn.Module):
     def __init__(self, in_channels, output_channels, joints_dim, joints_dim_r, p=0, dropout=None):
@@ -127,6 +149,45 @@ class GlobalGraph(nn.Module):
         return y
 
 
+class LDSTNet(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, time_dim, joints_dim, dropout, bias=True):
+        super(LDSTNet, self).__init__()
+        self.kernel_size = kernel_size
+        assert self.kernel_size[0] % 2 == 1 and self.kernel_size[1] % 2 == 1
+        padding = ((self.kernel_size[0] - 1) // 2, (self.kernel_size[1] - 1) // 2)
+        self.gcn_cd1 = LDNET(in_channels, joints_dim)
+        self.Pool_1 = JointForcePooling(joints_dim, joints_dim - 6, in_channels, time_dim)
+        self.gcn_cd2 = LDNET(in_channels, joints_dim - 6)
+        self.att_cd2 = JointForceRestoring(in_channels, in_channels, joints_dim, joints_dim - 6, dropout=dropout)
+        self.Pool_2 = JointForcePooling(joints_dim, joints_dim - 10, in_channels, time_dim)
+        self.gcn_cd3 = LDNET(in_channels, joints_dim - 10)
+        self.att_cd3 = JointForceRestoring(in_channels, in_channels, joints_dim, joints_dim - 10, dropout=dropout)
+        self.tcn = nn.Sequential(
+            nn.Conv2d(in_channels * 4, out_channels, (self.kernel_size[0], self.kernel_size[1]), (stride, stride),
+                      padding), nn.BatchNorm2d(out_channels), nn.Dropout(dropout, inplace=True))
+        if stride != 1 or in_channels != out_channels:
+            self.residual = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=(1, 1)),
+                                          nn.BatchNorm2d(out_channels))
+        else:
+            self.residual = nn.Identity()
+        self.prelu = nn.PReLU()
+
+    def forward(self, x):
+        res = self.residual(x)
+        x_cd1, FA_1 = self.gcn_cd1(x)
+        x_2 = self.Pool_1(x_cd1, FA_1)
+        x_cd2, _ = self.gcn_cd2(x_2)
+        x_cd2 = self.att_cd2(x_cd1, x_cd2)
+        x_3 = self.Pool_2(x_cd1, FA_1)
+        x_cd3, _ = self.gcn_cd3(x_3)
+        x_cd3 = self.att_cd3(x_cd1, x_cd3)
+        x = torch.cat((x, x_cd1, x_cd2, x_cd3), dim=1)
+        x = self.tcn(x)
+        x = x + res
+        x = self.prelu(x)
+        return x
+
+
 class JointForceDecoder(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, dropout, bias=True):
         super(JointForceDecoder, self).__init__()
@@ -192,5 +253,3 @@ class AMLDSTNet(nn.Module):
         for i in range(1, self.JointForceDecoder_layers):
             x = self.prelus[i](self.JointForceDecoder[i](x)) + x
         return x
-
-

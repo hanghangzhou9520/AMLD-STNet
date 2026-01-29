@@ -38,7 +38,6 @@ If you use our code, please cite our work.
   number={},<br>
   pages={1-1},<br>
   doi={10.1109/TCSVT.2026.3657489}}<br>
-```
 
 ## Acknowledgement
 Our code is extended from the following repositories.

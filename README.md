@@ -6,6 +6,7 @@
 <p align="center"><img src="figure/fig_model.png" width="100%" alt="" /></p>
 
 ## Abstract
+
 > Human body dynamics, as a temporal variation pattern of pose sequences in 3D skeleton-based human motion prediction, 
 > has been extensively studied in spatial-temporal dependent modeling of deep learning. However, designing an effective
 > modeling approach that fully harnesses physical principles to enhance algorithmic performance remains a challenge. 
@@ -24,3 +25,22 @@
 > training. Finally, extensive experiments are conducted on three popular benchmarks, such as Human 3.6M, AMASS, and 3DPW, 
 > among which AMLD-STNet achieved state-of-the-art results with a smaller model size.
 
+## Install dependencies:
+>  pip install -r requirements.txt
+## Citation
+If you use our code, please cite our work.
+> @ARTICLE{11363270,<br>
+  author={Zhou, Hanghang and Zhang, Yumei and Guo, Xiangying and Zhao, Keying and Yang, Honghong and Wu, Xiaojun and Du, Zexing}, <br>
+  journal={IEEE Transactions on Circuits and Systems for Video Technology}, <br>
+  title={Adaptive Multi-scale Lagrange Dynamics Spatial-Temporal Network for 3D Skeleton-based Human Motion Prediction}, <br>
+  year={2026},<br>
+  volume={},<br>
+  number={},<br>
+  pages={1-1},<br>
+  doi={10.1109/TCSVT.2026.3657489}}<br>
+```
+
+## Acknowledgement
+Our code is extended from the following repositories.
+> - [STS-GCN](https://github.com/FraLuca/STSGCN) <br>
+> - [GAST-Net](https://github.com/fabro66/GAST-Net-3DPoseEstimation)

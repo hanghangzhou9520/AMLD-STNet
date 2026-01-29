@@ -20,3 +20,4 @@
 > Euler angle loss is employed to enforce rotational consistency constraints, thereby enhancing physical realism during network
 > training. Finally, extensive experiments are conducted on three popular benchmarks, such as Human 3.6M, AMASS, and 3DPW, 
 > among which AMLD-STNet achieved state-of-the-art results with a smaller model size.
+<p align="center"><img src="figure/fig_model.png" width="100%" alt="" /></p>
